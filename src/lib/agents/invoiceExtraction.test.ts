@@ -124,6 +124,61 @@ describe("extractInvoiceFields — optional amounts default to '0.00'", () => {
   });
 });
 
+describe("extractInvoiceFields — Gefo Gutschrift transport fields", () => {
+  it("passes transport fields and European amounts through verbatim", async () => {
+    // Real values from Gutschrift 26400013 → invoice 26-001.
+    const gutschrift = JSON.stringify({
+      company: "Gefo",
+      recipient_name: "Gefo gesellschaft für oeltransporte MBH",
+      recipient_address: "Raboisen 5 20095 Hamburg",
+      recipient_vat: "DE118512502",
+      recipient_reg: "HRB 9605",
+      vessel: "Aqua Donna",
+      invoice_date: "06-01-2026",
+      invoice_number: "",
+      voyage_no: "",
+      product: "HVO",
+      load_port: "Eurotank Amsterdam",
+      discharge_port: "Evos Hamburg",
+      tonnage: "1062",
+      price_per_ton: "35,65",
+      freight_amount: "37.860,30",
+      commission_pct: "5",
+      commission_amount: "-1.893,02",
+      total: "35.967,28",
+    });
+    completeMock.mockResolvedValueOnce(gutschrift);
+
+    const result = await extractInvoiceFields("gutschrift pdf text");
+
+    // European display format must survive — parseFloat("35.967,28") would
+    // truncate to 35.97, so verbatim pass-through is the contract here.
+    expect(result.total).toBe("35.967,28");
+    expect(result.price_per_ton).toBe("35,65");
+    expect(result.freight_amount).toBe("37.860,30");
+    expect(result.commission_amount).toBe("-1.893,02");
+    expect(result.tonnage).toBe("1062");
+    expect(result.load_port).toBe("Eurotank Amsterdam");
+    expect(result.discharge_port).toBe("Evos Hamburg");
+    // Aquavoy's own counters are never taken from the source document.
+    expect(result.invoice_number).toBe("");
+    expect(result.voyage_no).toBe("");
+    // Crewing set stays defaulted.
+    expect(result.crewing).toBe("0.00");
+  });
+
+  it("defaults transport fields to empty strings for crewing-only documents", async () => {
+    completeMock.mockResolvedValueOnce(VALID_RESPONSE);
+
+    const result = await extractInvoiceFields("crewing pdf text");
+
+    expect(result.product).toBe("");
+    expect(result.load_port).toBe("");
+    expect(result.tonnage).toBe("");
+    expect(result.voyage_no).toBe("");
+  });
+});
+
 describe("extractInvoiceFields — schema validation failures", () => {
   it("throws naming 'total' when the field is missing", async () => {
     const missingTotal = JSON.stringify({

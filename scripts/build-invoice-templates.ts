@@ -107,10 +107,23 @@ ${bodyLines.join("\n")}
 }
 
 // ---------------------------------------------------------------------------
-// Issuer block (same for both templates — Aquavoy Ltd)
+// Issuer blocks — Gefo transportation invoices are issued as "Aquavoy Shipping
+// Ltd." with the company registration number (real sample: invoice 26-001);
+// Novo Porto sales invoices keep the "Aquavoy Ltd" block from invoice 26-047.
 // ---------------------------------------------------------------------------
 
-function issuerBlock(): string[] {
+function gefoIssuerBlock(): string[] {
+  return [
+    para("Aquavoy Shipping Ltd.", true),
+    para("Ledras 147 1st floor office 6"),
+    para("1011 Nicosia, Cyprus"),
+    para("V.A.T CY60038875Q"),
+    para("Registration Number HE 454167"),
+    para(""),
+  ];
+}
+
+function novoIssuerBlock(): string[] {
   return [
     para("Aquavoy Ltd", true),
     para("Ledras 147 1st floor office 6"),
@@ -162,23 +175,42 @@ function footerBlock(): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Gefo template body
+// Gefo template body — transportation invoice, mirrors the real sample
+// "26-001 Invoice Aquavoy - Gefo 06-01-2026 voyage 01": Barge / Product /
+// ports / quantity × price-per-ton / commission / VAT reverse charge / total.
+// Amount tokens are display-formatted European strings ("37.860,30").
 // ---------------------------------------------------------------------------
 
 function gefoBody(): string[] {
   return [
-    ...issuerBlock(),
-    ...recipientBlock(),
-    ...metaBlock(),
+    ...gefoIssuerBlock(),
+    para("{recipient_name}", true),
+    para("{recipient_address}"),
+    para("V.A.T {recipient_vat}"),
+    para("Registration Number {recipient_reg}"),
+    para(""),
+    para("Invoice Date: {invoice_date}"),
+    para("Invoice Number: {invoice_number}"),
+    para("Voyage: {voyage_no}"),
+    para(""),
+    para("Hereby, we charge you for transportation services"),
+    para(""),
+    para("Barge                                Mts {vessel}"),
+    para("Product                              {product}"),
+    para("Loading port / Discharge port        {load_port} / {discharge_port}"),
     para(
-      "Hereby we charge you for services rendered onboard of the Mts {vessel},"
+      "Quantity / Price per ton             {tonnage} T x € {price_per_ton}          € {freight_amount}"
     ),
     para(
-      "(voyage/layover period — see attached voyage/layover statement for details)"
+      "Commission {commission_pct} %                                                € {commission_amount}"
     ),
     para(""),
-    ...lineItemsBlock(),
-    ...footerBlock(),
+    para("VAT REVERSE CHARGED BY RECIPIENT", true),
+    para("Total                                € {total}", true),
+    para(""),
+    para("Revolut Bank IBAN LT623250078171942284"),
+    para("Bic REVOLT21"),
+    para("Email Admin@aquavoy.com"),
   ];
 }
 
@@ -188,7 +220,7 @@ function gefoBody(): string[] {
 
 function novoPortoBody(): string[] {
   return [
-    ...issuerBlock(),
+    ...novoIssuerBlock(),
     ...recipientBlock(),
     ...metaBlock(),
     para("Hereby we charge you for services rendered onboard of the Mts {vessel},"),
@@ -215,18 +247,31 @@ function buildDocx(documentXml: string): Buffer {
 // Render-test: verify all {tag} tokens are well-formed
 // ---------------------------------------------------------------------------
 
+// Transport-field values are the REAL invoice 26-001 (built from Gutschrift
+// 26400013) so the gefo render-test doubles as a fidelity check against the
+// client's actual document. Crewing fields cover the novo-porto tags.
 const SAMPLE_DATA = {
-  recipient_name: "Novo Porto Scheepvaart BV",
-  recipient_address: "Wilhelminaplein 1, 2074 DE Rotterdam",
-  recipient_vat: "NL819154064B01",
-  invoice_date: "27-05-2026",
-  invoice_number: "26-047",
-  vessel: "Pride of Faial",
+  recipient_name: "Gefo gesellschaft für oeltransporte MBH",
+  recipient_address: "Raboisen 5 20095 Hamburg",
+  recipient_vat: "DE118512502",
+  recipient_reg: "HRB 9605",
+  invoice_date: "06-01-2026",
+  invoice_number: "26-001",
+  voyage_no: "01",
+  vessel: "Aqua Donna",
+  product: "HVO",
+  load_port: "Eurotank Amsterdam",
+  discharge_port: "Evos Hamburg",
+  tonnage: "1062",
+  price_per_ton: "35,65",
+  freight_amount: "37.860,30",
+  commission_pct: "5",
+  commission_amount: "-1.893,02",
   crewing: "4500.00",
   travel: "350.00",
   service_fee: "200.00",
   cash_advance: "500.00",
-  total: "4550.00",
+  total: "35.967,28",
 };
 
 function renderTest(buf: Buffer, label: string): void {

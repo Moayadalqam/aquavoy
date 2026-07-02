@@ -490,9 +490,19 @@ export async function executeConfirmedAction(
         recipient_name: str(args, "recipient_name"),
         recipient_address: str(args, "recipient_address"),
         recipient_vat: str(args, "recipient_vat"),
+        recipient_reg: str(args, "recipient_reg"),
         vessel: str(args, "vessel"),
         invoice_date: str(args, "invoice_date"),
         invoice_number: invoiceNumber,
+        voyage_no: str(args, "voyage_no"),
+        product: str(args, "product"),
+        load_port: str(args, "load_port"),
+        discharge_port: str(args, "discharge_port"),
+        tonnage: str(args, "tonnage"),
+        price_per_ton: str(args, "price_per_ton"),
+        freight_amount: str(args, "freight_amount"),
+        commission_pct: str(args, "commission_pct"),
+        commission_amount: str(args, "commission_amount"),
         crewing: str(args, "crewing") || "0.00",
         travel: str(args, "travel") || "0.00",
         service_fee: str(args, "service_fee") || "0.00",
@@ -504,11 +514,13 @@ export async function executeConfirmedAction(
       const filledBuffer = fillInvoiceTemplate(templateBuffer, fields);
 
       // Build the filename per company convention.
-      // Gefo:       "{number} Invoice Aquavoy - Gefo {date} voyage NN.docx"
+      // Gefo:       "{number} Invoice Aquavoy - Gefo {date} voyage {NN}.docx"
+      //             (real sample: "26-001 Invoice Aquavoy - Gefo 06-01-2026 voyage 01.docx")
       // Novo Porto: "{number} Aquavoy Ltd - Novo Porto Scheepvaart BV {date}.docx"
+      const voyageSuffix = fields.voyage_no ? `voyage ${fields.voyage_no}` : "voyage";
       const filename =
         company === "Gefo"
-          ? `${invoiceNumber} Invoice Aquavoy - Gefo ${fields.invoice_date} voyage.docx`
+          ? `${invoiceNumber} Invoice Aquavoy - Gefo ${fields.invoice_date} ${voyageSuffix}.docx`
           : `${invoiceNumber} Aquavoy Ltd - Novo Porto Scheepvaart BV ${fields.invoice_date}.docx`;
 
       const connId = await resolveConnectionId();

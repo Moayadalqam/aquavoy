@@ -940,7 +940,7 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: "generate_invoice_from_template",
       description:
-        "Generate a Aquavoy invoice .docx from the correct per-company template and save it to OneDrive (Verzonden Facturen/{year}). CONFIRMED BEFORE SAVING — this tool stages the action and returns a summary for the user to approve; the fill + upload happen only at confirm, never in the model loop. Call ONCE after extracting fields from the source PDF; relay the returned summary and do NOT re-call after the user says yes — confirming is the UI's job.",
+        "Generate a Aquavoy invoice .docx from the correct per-company template and save it to OneDrive (Verzonden Facturen/{year}). CONFIRMED BEFORE SAVING — this tool stages the action and returns a summary for the user to approve; the fill + upload happen only at confirm, never in the model loop. Call ONCE after extracting fields from the source PDF; relay the returned summary and do NOT re-call after the user says yes — confirming is the UI's job. TWO INVOICE KINDS: (1) Gefo = a TRANSPORTATION invoice built from a GEFO Gutschrift (German self-billing credit note, arrives at admin@): fill the transport fields (vessel, product, load_port/discharge_port, tonnage, price_per_ton, freight_amount, commission, total). German-document rules: Schiff 'AQUA-DONNA' → vessel 'Aqua Donna'; Ladehafen/Löschhafen are 'City, Terminal' and the invoice shows 'Terminal City' (e.g. 'Amsterdam, Eurotank' → 'Eurotank Amsterdam'); the billed tonnage is the integer on the Fracht line where German '1.062 t' means 1062 tonnes; amounts stay in European display format ('37.860,30', price '35,65', commission negative '-1.893,02'). invoice_number is Aquavoy's OWN next sequential YY-NNN — NOT the Gutschrift Belegnummer (264xxxxx) and NOT the Gefo Referenz; check the latest invoice in Verzonden Facturen/{year} or ask. voyage_no is Wency's own voyage counter (the register REIS column), not in the Gutschrift — propose the next one and let the user correct it on the confirm card. invoice_date = the Gutschrift Datum as DD-MM-YYYY. (2) Novo Porto = a crewing-services invoice: fill crewing/travel/service_fee/cash_advance instead.",
       parameters: {
         type: "object",
         properties: {
@@ -964,35 +964,75 @@ export const TOOL_DEFINITIONS = [
           },
           vessel: {
             type: "string",
-            description: "Vessel name (e.g. 'Pride of Faial').",
+            description: "Vessel name without 'Mts' prefix (e.g. 'Aqua Donna', 'Pride of Faial').",
           },
           invoice_date: {
             type: "string",
-            description: "Invoice date in DD-MM-YYYY format.",
+            description: "Invoice date in DD-MM-YYYY format (for Gefo: the Gutschrift Datum).",
           },
           invoice_number: {
             type: "string",
-            description: "Invoice number in YY-NNN format (e.g. '26-047').",
+            description: "Aquavoy's OWN invoice number in YY-NNN format (e.g. '26-001'). NEVER the source document's number.",
+          },
+          recipient_reg: {
+            type: "string",
+            description: "Recipient company registration number (Gefo: 'HRB 9605').",
+          },
+          voyage_no: {
+            type: "string",
+            description: "Gefo only — Wency's voyage counter (register REIS column), e.g. '01'. Not in the source document; propose and let the user correct.",
+          },
+          product: {
+            type: "string",
+            description: "Gefo only — cargo product from the Gutschrift Produkt line (e.g. 'HVO').",
+          },
+          load_port: {
+            type: "string",
+            description: "Gefo only — loading terminal+city, reordered from Ladehafen 'City, Terminal' (e.g. 'Eurotank Amsterdam').",
+          },
+          discharge_port: {
+            type: "string",
+            description: "Gefo only — discharge terminal+city, reordered from Löschhafen (e.g. 'Evos Hamburg').",
+          },
+          tonnage: {
+            type: "string",
+            description: "Gefo only — billed tonnage integer from the Fracht line; German '1.062 t' = '1062'.",
+          },
+          price_per_ton: {
+            type: "string",
+            description: "Gefo only — freight rate €/t in European format (e.g. '35,65').",
+          },
+          freight_amount: {
+            type: "string",
+            description: "Gefo only — freight line amount in European format (e.g. '37.860,30').",
+          },
+          commission_pct: {
+            type: "string",
+            description: "Gefo only — Bereederungskommission percentage as a bare number (e.g. '5').",
+          },
+          commission_amount: {
+            type: "string",
+            description: "Gefo only — commission deduction in European format, negative (e.g. '-1.893,02').",
           },
           crewing: {
             type: "string",
-            description: "Crewing services amount as a formatted string (e.g. '4500.00'). Defaults to '0.00' if absent.",
+            description: "Novo Porto only — crewing services amount as a formatted string (e.g. '4500.00'). Defaults to '0.00' if absent.",
           },
           travel: {
             type: "string",
-            description: "Travel cost amount. Defaults to '0.00' if absent.",
+            description: "Novo Porto only — travel cost amount. Defaults to '0.00' if absent.",
           },
           service_fee: {
             type: "string",
-            description: "Service fee (food and drink) amount. Defaults to '0.00' if absent.",
+            description: "Novo Porto only — service fee (food and drink) amount. Defaults to '0.00' if absent.",
           },
           cash_advance: {
             type: "string",
-            description: "Cash advance amount. Defaults to '0.00' if absent.",
+            description: "Novo Porto only — cash advance amount. Defaults to '0.00' if absent.",
           },
           total: {
             type: "string",
-            description: "Total invoice amount.",
+            description: "Total invoice amount. For Gefo use European format matching the Endbetrag (e.g. '35.967,28').",
           },
           currency: {
             type: "string",
@@ -1253,9 +1293,11 @@ function summarizeAction(name: string, args: Record<string, unknown>): string {
       const company = s("company") || "unknown company";
       const invoiceNumber = s("invoice_number") || "?";
       const recipientName = s("recipient_name") || company;
+      const voyageNo = s("voyage_no");
+      const voyage = voyageNo ? ` (voyage ${voyageNo})` : "";
       const year =
         s("targetYear") || String(new Date().getFullYear());
-      return `Generate ${company} invoice ${invoiceNumber} for ${recipientName} → Verzonden Facturen/${year}`;
+      return `Generate ${company} invoice ${invoiceNumber}${voyage} for ${recipientName} → Verzonden Facturen/${year}`;
     }
     default:
       return `Run ${name}`;
@@ -1452,9 +1494,25 @@ export async function executeTool(
               typeof args.recipient_address === "string" ? args.recipient_address : "",
             recipient_vat:
               typeof args.recipient_vat === "string" ? args.recipient_vat : "",
+            recipient_reg:
+              typeof args.recipient_reg === "string" ? args.recipient_reg : "",
             vessel: typeof args.vessel === "string" ? args.vessel : "",
             invoice_date: typeof args.invoice_date === "string" ? args.invoice_date : "",
             invoice_number: invoiceNumber,
+            voyage_no: typeof args.voyage_no === "string" ? args.voyage_no : "",
+            product: typeof args.product === "string" ? args.product : "",
+            load_port: typeof args.load_port === "string" ? args.load_port : "",
+            discharge_port:
+              typeof args.discharge_port === "string" ? args.discharge_port : "",
+            tonnage: typeof args.tonnage === "string" ? args.tonnage : "",
+            price_per_ton:
+              typeof args.price_per_ton === "string" ? args.price_per_ton : "",
+            freight_amount:
+              typeof args.freight_amount === "string" ? args.freight_amount : "",
+            commission_pct:
+              typeof args.commission_pct === "string" ? args.commission_pct : "",
+            commission_amount:
+              typeof args.commission_amount === "string" ? args.commission_amount : "",
             crewing: typeof args.crewing === "string" ? args.crewing : "0.00",
             travel: typeof args.travel === "string" ? args.travel : "0.00",
             service_fee: typeof args.service_fee === "string" ? args.service_fee : "0.00",

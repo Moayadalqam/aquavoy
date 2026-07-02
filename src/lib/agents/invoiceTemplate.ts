@@ -5,6 +5,13 @@ import PizZip from "pizzip";
  * All token fields used in the Aquavoy invoice `.docx` templates.
  * Matches the token set documented in `assets/invoice-templates/README.md`.
  * Every field is a string — amounts are pre-formatted by the caller.
+ *
+ * Two token sets share this one flat interface (unused tokens fill as "" via
+ * `nullGetter`):
+ *  - crewing set (novo-porto.docx): crewing / travel / service_fee / cash_advance
+ *  - transport set (gefo.docx, real sample invoice 26-001): voyage_no / product /
+ *    ports / tonnage × price-per-ton / commission — amounts are DISPLAY-formatted
+ *    European strings (e.g. "37.860,30", price "35,65"), passed through verbatim.
  */
 export interface InvoiceFields {
   recipient_name: string;
@@ -19,6 +26,17 @@ export interface InvoiceFields {
   cash_advance: string;
   total: string;
   currency: string;
+  // Transport-invoice tokens (gefo.docx)
+  recipient_reg?: string;
+  voyage_no?: string;
+  product?: string;
+  load_port?: string;
+  discharge_port?: string;
+  tonnage?: string;
+  price_per_ton?: string;
+  freight_amount?: string;
+  commission_pct?: string;
+  commission_amount?: string;
 }
 
 /**

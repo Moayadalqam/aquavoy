@@ -36,6 +36,38 @@ const SAMPLE_FIELDS: InvoiceFields = {
   currency: "EUR",
 };
 
+// Real transportation-invoice values from the client's actual
+// "26-001 Invoice Aquavoy - Gefo 06-01-2026 voyage 01" (source: Gutschrift 26400013).
+const GEFO_TRANSPORT_FIELDS: InvoiceFields = {
+  recipient_name: "Gefo gesellschaft für oeltransporte MBH",
+  recipient_address: "Raboisen 5 20095 Hamburg",
+  recipient_vat: "DE118512502",
+  recipient_reg: "HRB 9605",
+  invoice_date: "06-01-2026",
+  invoice_number: "26-001",
+  voyage_no: "01",
+  vessel: "Aqua Donna",
+  product: "HVO",
+  load_port: "Eurotank Amsterdam",
+  discharge_port: "Evos Hamburg",
+  tonnage: "1062",
+  price_per_ton: "35,65",
+  freight_amount: "37.860,30",
+  commission_pct: "5",
+  commission_amount: "-1.893,02",
+  crewing: "0.00",
+  travel: "0.00",
+  service_fee: "0.00",
+  cash_advance: "0.00",
+  total: "35.967,28",
+  currency: "EUR",
+};
+
+/** Extract the rendered document.xml text from a filled .docx buffer. */
+function docXmlText(docx: Buffer): string {
+  return new PizZip(docx).file("word/document.xml")!.asText();
+}
+
 describe("fillInvoiceTemplate — gefo.docx fixture", () => {
   it("returns a non-empty Buffer when valid fields are provided", () => {
     const templateBuf = readFileSync(path.join(FIXTURES_DIR, "gefo.docx"));
@@ -48,11 +80,29 @@ describe("fillInvoiceTemplate — gefo.docx fixture", () => {
     expect(result[1]).toBe(0x4b); // 'K'
   });
 
-  it("also renders novo-porto.docx without error", () => {
+  it("renders the real 26-001 transportation-invoice content (not crewing)", () => {
+    const templateBuf = readFileSync(path.join(FIXTURES_DIR, "gefo.docx"));
+    const xml = docXmlText(fillInvoiceTemplate(templateBuf, GEFO_TRANSPORT_FIELDS));
+
+    expect(xml).toContain("transportation services");
+    expect(xml).toContain("Mts Aqua Donna");
+    expect(xml).toContain("Voyage: 01");
+    expect(xml).toContain("Eurotank Amsterdam / Evos Hamburg");
+    expect(xml).toContain("1062 T x € 35,65");
+    expect(xml).toContain("VAT REVERSE CHARGED BY RECIPIENT");
+    expect(xml).toContain("35.967,28");
+    expect(xml).toContain("Aquavoy Shipping Ltd.");
+    expect(xml).toContain("Registration Number HE 454167");
+    // The old placeholder structure must be gone from the Gefo template.
+    expect(xml).not.toContain("Crewing Services");
+  });
+
+  it("also renders novo-porto.docx without error, keeping the crewing structure", () => {
     const templateBuf = readFileSync(path.join(FIXTURES_DIR, "novo-porto.docx"));
     const result = fillInvoiceTemplate(templateBuf, SAMPLE_FIELDS);
 
     expect(result.byteLength).toBeGreaterThan(0);
+    expect(docXmlText(result)).toContain("Crewing Services");
   });
 });
 

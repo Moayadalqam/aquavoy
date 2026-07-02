@@ -748,6 +748,55 @@ describe("executeConfirmedAction — generate_invoice_from_template", () => {
     expect(out.undo_data).toEqual({ uploadedItemId: "drive-gefo-1" });
   });
 
+  it("Gefo transport invoice: voyage number lands in the filename and transport fields reach the fill", async () => {
+    getInvoiceTemplateMock.mockResolvedValue({
+      ...templateRow,
+      company: "Gefo",
+      template_ref: "assets/invoice-templates/gefo.docx",
+    });
+
+    await executeConfirmedAction(
+      "generate_invoice_from_template",
+      baseArgs({
+        company: "Gefo",
+        recipient_name: "Gefo gesellschaft für oeltransporte MBH",
+        recipient_reg: "HRB 9605",
+        invoice_number: "26-001",
+        invoice_date: "06-01-2026",
+        voyage_no: "01",
+        vessel: "Aqua Donna",
+        product: "HVO",
+        load_port: "Eurotank Amsterdam",
+        discharge_port: "Evos Hamburg",
+        tonnage: "1062",
+        price_per_ton: "35,65",
+        freight_amount: "37.860,30",
+        commission_pct: "5",
+        commission_amount: "-1.893,02",
+        total: "35.967,28",
+      }),
+      PRINCIPAL,
+    );
+
+    // Real client convention: "26-001 Invoice Aquavoy - Gefo 06-01-2026 voyage 01.docx"
+    const [, , filename] = uploadFileMock.mock.calls[0]!;
+    expect(filename).toBe("26-001 Invoice Aquavoy - Gefo 06-01-2026 voyage 01.docx");
+
+    expect(fillInvoiceTemplateMock).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.objectContaining({
+        voyage_no: "01",
+        product: "HVO",
+        load_port: "Eurotank Amsterdam",
+        discharge_port: "Evos Hamburg",
+        tonnage: "1062",
+        price_per_ton: "35,65",
+        commission_amount: "-1.893,02",
+        total: "35.967,28",
+      }),
+    );
+  });
+
   it("defaults targetYear to the current year when not supplied", async () => {
     await executeConfirmedAction(
       "generate_invoice_from_template",
