@@ -8,3 +8,5 @@ tracking.json
 .state.journal
 .backup/
 migration-manifest.json
+.session-usage.json
+.compaction-snapshot.md
